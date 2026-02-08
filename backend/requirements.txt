@@ -1,0 +1,41 @@
+# ============================================
+# KYC Backend - FastAPI Requirements
+# ============================================
+
+# Web Framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
+
+# HTTP & Async
+httpx>=0.26.0
+requests>=2.32.0
+
+# Database
+supabase>=2.0.0
+websockets>=13.0,<16.0
+
+# Authentication & Security
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-dotenv>=1.0.0
+
+# Data Processing
+pandas>=2.2.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Phone Validation
+phonenumbers>=8.13.27
+
+# AI
+google-generativeai>=0.8.0
+
+# Optional: Better JSON
+orjson>=3.10.0
+
+# Job Scheduling (Monitoramento)
+schedule>=1.2.0
+
+# CORS
+python-multipart>=0.0.6

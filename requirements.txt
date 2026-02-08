@@ -1,0 +1,34 @@
+# ============================================
+# KYC Dossiê de Análise de Risco - Dependências
+# ============================================
+
+# Core Framework
+streamlit>=1.40.0
+
+# HTTP Requests
+requests>=2.32.0
+
+# Data Processing
+pandas>=2.2.0
+
+# Phone Validation
+phonenumbers>=8.13.27
+
+# Environment Variables
+python-dotenv>=1.0.0
+
+# Optional: Better JSON handling
+orjson>=3.10.0
+
+# Job Scheduling (Monitoramento)
+schedule>=1.2.0
+
+# Supabase (Auth & Database)
+supabase>=2.0.0
+websockets>=13.0,<16.0
+
+# Google Gemini AI
+google-generativeai>=0.8.0
+
+# Optional: PDF Export (para futuro)
+# reportlab==4.0.9
