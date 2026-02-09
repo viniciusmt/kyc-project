@@ -60,6 +60,26 @@ def query_cnpj(cnpj: str) -> Dict[str, any]:
 
         if response.status_code == 200:
             data = response.json()
+            data_inicio_atividade = data.get("data_inicio_atividade") or data.get("data_abertura") or ""
+
+            # Se a BrasilAPI não trouxer data de abertura, tenta ReceitaWS para preencher
+            if not data_inicio_atividade:
+                fallback = query_cnpj_receitaws(cnpj)
+                if fallback.get("success"):
+                    data_inicio_atividade = (
+                        fallback.get("data_abertura")
+                        or fallback.get("data_inicio_atividade")
+                        or ""
+                    )
+                    if not data.get("razao_social"):
+                        data["razao_social"] = fallback.get("razao_social")
+                    if not data.get("nome_fantasia"):
+                        data["nome_fantasia"] = fallback.get("nome_fantasia")
+                    if not data.get("descricao_situacao_cadastral"):
+                        data["descricao_situacao_cadastral"] = fallback.get("situacao_cadastral")
+                    if not data.get("situacao_cadastral"):
+                        data["situacao_cadastral"] = fallback.get("situacao_cadastral")
+
             razao_social = (
                 data.get("razao_social")
                 or data.get("razaoSocial")
@@ -79,7 +99,7 @@ def query_cnpj(cnpj: str) -> Dict[str, any]:
                 "nome_fantasia": nome_fantasia or "",
                 "cnpj": data.get("cnpj", cnpj),
                 "situacao_cadastral": data.get("descricao_situacao_cadastral", data.get("situacao_cadastral", "")),
-                "data_abertura": data.get("data_inicio_atividade", ""),
+                "data_abertura": data_inicio_atividade or "",
                 "porte": data.get("porte", ""),
                 "natureza_juridica": data.get("natureza_juridica", ""),
                 "endereco": {

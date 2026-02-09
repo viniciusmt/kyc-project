@@ -12,6 +12,10 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 import kyc_engine
 import time
+try:
+    import google.generativeai as genai
+except Exception:
+    genai = None
 
 load_dotenv()
 
@@ -20,6 +24,69 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+
+def _build_ai_prompt(kyc_data: Dict, report_data: Dict) -> str:
+    doc = kyc_data.get("document", "")
+    doc_type = kyc_data.get("doc_type", "")
+    risk = kyc_data.get("risk_level", "DESCONHECIDO")
+    cadastral = kyc_data.get("cadastral_data", {}) or {}
+    sanctions = kyc_data.get("sanctions", {}) or {}
+    total_sanctions = sanctions.get("total_sanctions", 0)
+    name = (
+        cadastral.get("razao_social")
+        or cadastral.get("nome_fantasia")
+        or cadastral.get("nome")
+        or f"{doc_type} {doc}"
+    )
+    situacao = (
+        cadastral.get("situacao_cadastral")
+        or cadastral.get("descricao_situacao_cadastral")
+        or cadastral.get("situacao")
+        or "N/A"
+    )
+
+    return (
+        "Você é um analista de compliance. Gere uma análise curta (4-6 linhas) e objetiva.\n"
+        f"Documento: {doc} ({doc_type})\n"
+        f"Entidade: {name}\n"
+        f"Situação cadastral: {situacao}\n"
+        f"Nível de risco calculado: {risk}\n"
+        f"Total de sanções encontradas: {total_sanctions}\n"
+        "Inclua uma recomendação final simples (Aprovar / Revisar / Reprovar) com base nos dados.\n"
+    )
+
+
+def _generate_ai_analysis(kyc_data: Dict, report_data: Dict) -> str:
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return "IA não configurada: defina GEMINI_API_KEY para habilitar a análise."
+    if genai is None:
+        return "IA indisponível: biblioteca google-generativeai não está instalada."
+
+    try:
+        genai.configure(api_key=api_key)
+        preferred_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        fallback_models = [
+            preferred_model,
+            "gemini-2.0-flash",
+            "gemini-1.5-flash",
+        ]
+        prompt = _build_ai_prompt(kyc_data, report_data)
+        last_error = None
+        for model_name in fallback_models:
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = model.generate_content(prompt)
+                text = getattr(response, "text", None)
+                if text:
+                    return text.strip()
+                last_error = "IA retornou resposta vazia."
+            except Exception as e:
+                last_error = str(e)
+                continue
+        return f"IA falhou ao gerar análise: {last_error}"
+    except Exception as e:
+        return f"IA falhou ao gerar análise: {str(e)}"
 
 def _normalize_cnpj_cadastral(cadastral: Dict) -> Dict[str, any]:
     if not cadastral:
@@ -148,6 +215,25 @@ def generate_and_save_dossier(
         # 3. Monta report_data (formato esperado pelo frontend)
         cadastral = kyc_data.get("cadastral_data", {})
         normalized_cadastral = _normalize_cnpj_cadastral(cadastral) if kyc_data.get("doc_type") == "CNPJ" else {}
+        receitaws_data = {}
+        if kyc_data.get("doc_type") == "CNPJ" and not normalized_cadastral.get("data_abertura"):
+            receitaws_data = kyc_engine.query_cnpj_receitaws(kyc_data.get("document", "")) or {}
+            if receitaws_data.get("success"):
+                # Preenche campos faltantes com fallback ReceitaWS
+                for key in [
+                    "razao_social",
+                    "nome_fantasia",
+                    "situacao_cadastral",
+                    "data_abertura",
+                    "capital_social",
+                    "porte",
+                    "natureza_juridica",
+                    "endereco",
+                    "qsa",
+                ]:
+                    if not normalized_cadastral.get(key):
+                        normalized_cadastral[key] = receitaws_data.get(key, normalized_cadastral.get(key))
+                normalized_cadastral["success"] = True
         sanctions_data = kyc_data.get("sanctions", {})
 
         # Estrutura compatível com o frontend
@@ -165,6 +251,10 @@ def generate_and_save_dossier(
                     "brasilapi_cnpj": {
                         "ok": bool(normalized_cadastral) and normalized_cadastral.get("success", False),
                         "data": normalized_cadastral if normalized_cadastral else {}
+                    },
+                    "receitaws_cnpj": {
+                        "ok": bool(receitaws_data) and receitaws_data.get("success", False),
+                        "data": receitaws_data if receitaws_data else {}
                     },
                     "transparencia_ceis": {
                         "ok": sanctions_data.get("success", False),
@@ -198,17 +288,7 @@ def generate_and_save_dossier(
 
         # 4. Análise de IA (se habilitada)
         if enable_ai:
-            try:
-                # TODO: Implementar integração com Gemini
-                report_data["ai_analysis"] = {
-                    "enabled": True,
-                    "status": "not_implemented"
-                }
-            except Exception as e:
-                report_data["ai_analysis"] = {
-                    "enabled": True,
-                    "error": str(e)
-                }
+            report_data["ai_analysis"] = _generate_ai_analysis(kyc_data, report_data)
 
         # 5. Salva no Supabase (schema correto da tabela)
         dossier_record = {

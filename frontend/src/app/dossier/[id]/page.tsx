@@ -109,7 +109,9 @@ export default function DossierPage() {
     );
   }
 
-  const reportData = dossier.report_data ?? (dossier as any).data;
+  const rawReportData = dossier.report_data ?? (dossier as any).data;
+  const reportData =
+    typeof rawReportData === 'string' ? JSON.parse(rawReportData) : rawReportData;
   const technicalReport = reportData?.technical_report;
   const derived = technicalReport?.derived;
   const sources = technicalReport?.sources;
@@ -160,6 +162,12 @@ export default function DossierPage() {
   const pepData = (reportData as any)?.pep_data || (dossier as any)?.data?.pep_data;
   const sanctions = (reportData as any)?.sanctions || (dossier as any)?.data?.sanctions;
   const aiAnalysis = reportData?.ai_analysis;
+  const aiAnalysisText =
+    typeof aiAnalysis === 'string'
+      ? aiAnalysis
+      : aiAnalysis
+      ? JSON.stringify(aiAnalysis, null, 2)
+      : null;
   const mediaFindings = reportData?.media_findings;
   const ceis = sources?.transparencia_ceis;
   const cnep = sources?.transparencia_cnep;
@@ -263,7 +271,9 @@ export default function DossierPage() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Nome Fantasia</p>
-                    <p className="font-medium">{companySummary.nome_fantasia || brasilApi?.nome_fantasia || '-'}</p>
+                    <p className="font-medium">
+                      {companySummary.nome_fantasia || brasilApi?.nome_fantasia || brasilApi?.fantasia || '-'}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Situação Cadastral</p>
@@ -271,7 +281,15 @@ export default function DossierPage() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Data de Abertura</p>
-                    <p className="font-medium">{brasilApi?.data_inicio_atividade || '-'}</p>
+                    <p className="font-medium">
+                      {companySummary.data_abertura ||
+                        (companySummary as any).data_inicio_atividade ||
+                        (companySummary as any).abertura ||
+                        brasilApi?.data_inicio_atividade ||
+                        brasilApi?.data_abertura ||
+                        brasilApi?.abertura ||
+                        '-'}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Capital Social</p>
@@ -460,7 +478,7 @@ export default function DossierPage() {
         )}
 
         {/* Análise de Risco com IA */}
-        {aiAnalysis && (
+        {aiAnalysisText && (
           <div className="bg-white rounded-lg shadow mb-6">
             <div className="px-6 py-4 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-800">🤖 Análise de Risco com IA</h2>
@@ -470,7 +488,7 @@ export default function DossierPage() {
                 <p className="font-bold text-lg mb-2">
                   Nível de Risco: {dossier.risk_level || '-'}
                 </p>
-                <p className="text-sm whitespace-pre-wrap">{aiAnalysis}</p>
+                <p className="text-sm whitespace-pre-wrap">{aiAnalysisText}</p>
               </div>
 
               {mediaFindings && (

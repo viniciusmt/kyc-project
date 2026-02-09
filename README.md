@@ -26,6 +26,7 @@ Sistema profissional de **Know Your Customer (KYC)** focado em compliance e aná
 - KYC engine: fallback automático para ReceitaWS quando a BrasilAPI falha.
 - Dossiê: normalização do `cadastral_data` antes de salvar em `report_data` para garantir campos básicos no frontend.
 - Dossiê: fallback de `entity_name` ao listar/buscar dossiês usando `report_data` quando o nome não existe.
+- Dossiê: fallback de **data de abertura** via ReceitaWS quando BrasilAPI retornar `data_inicio_atividade` vazio.
 - Frontend: aumento de timeout específico para Dossiê e Monitoramento (30s) para evitar falsos erros em consultas lentas.
 - Frontend: correção de hidratação no Header (nome da empresa/e-mail só após mount).
 
