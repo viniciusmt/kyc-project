@@ -5,7 +5,8 @@ Carrega variáveis de ambiente e configurações
 """
 
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Optional
+import os
 
 
 class Settings(BaseSettings):
@@ -15,30 +16,33 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api"
     PROJECT_NAME: str = "KYC System"
 
-    # CORS
-    CORS_ORIGINS: List[str] = [
-        "http://localhost:3000",  # Next.js dev
-        "http://localhost:8000",  # FastAPI dev
-        "https://your-production-domain.com"  # Production
-    ]
+    # CORS - aceita string separada por vírgula ou lista
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8000"
 
-    # Supabase
-    SUPABASE_URL: str
-    SUPABASE_KEY: str
-    SUPABASE_JWT_SECRET: str
+    # Supabase (virão do SSM no App Runner)
+    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
+    SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")
+    SUPABASE_JWT_SECRET: Optional[str] = os.getenv("SUPABASE_JWT_SECRET")
 
-    # APIs Externas
-    TRANSPARENCIA_API_KEY: str
-    GEMINI_API_KEY: str
+    # APIs Externas (virão do SSM no App Runner)
+    TRANSPARENCIA_API_KEY: str = os.getenv("TRANSPARENCIA_API_KEY", "")
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 
     # JWT
-    SECRET_KEY: str = "your-secret-key-change-in-production"
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+    ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))
 
     class Config:
         env_file = ".env"
         case_sensitive = True
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Converte CORS_ORIGINS de string para lista"""
+        if isinstance(self.CORS_ORIGINS, str):
+            return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
+        return self.CORS_ORIGINS
 
 
 settings = Settings()

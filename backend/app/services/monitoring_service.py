@@ -4,14 +4,9 @@ Monitoring Service - Wrapper
 Wrapper para o monitoring_engine.py existente
 """
 
-import os
-import sys
 import json
 
-# Adiciona diretório raiz ao path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
-
-from monitoring_engine import (
+from app.monitoring_engine import (
     add_monitored_record,
     remove_monitored_record,
     get_monitored_record,
