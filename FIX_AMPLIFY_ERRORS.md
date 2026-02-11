@@ -2,20 +2,21 @@
 
 ## Alterações Realizadas
 
-### 1. Configuração do Next.js para Exportação Estática
+### 1. Configuração do Next.js para SSR (Standalone)
 **Arquivo**: `frontend/next.config.js`
 
-Adicionado:
-- `output: 'export'` - Gera exportação estática
-- `images: { unoptimized: true }` - Necessário para export
+Ajustado para:
+- `output: 'standalone'` - Build otimizado para SSR no Amplify
 - `trailingSlash: true` - Melhora compatibilidade com Amplify
 
-### 2. Configuração do Amplify Build
-**Arquivo**: `frontend/amplify.yml`
+**Importante**: Não usamos `output: 'export'` porque temos rotas dinâmicas (`/dossier/[id]`) que precisam de SSR.
 
-Alterado:
-- `baseDirectory: out` (antes era `.next`)
-- Removido cache de `.next/cache`
+### 2. Configuração do Amplify Build
+**Arquivo**: `frontend/amplify.yml` e buildSpec no console
+
+Mantido:
+- `baseDirectory: .next` - Pasta padrão do Next.js
+- Cache de `node_modules` e `.next/cache`
 
 ## Próximos Passos
 
@@ -25,7 +26,7 @@ cd frontend
 npm run build
 ```
 
-Verifique se a pasta `out` foi criada com sucesso.
+Verifique se a pasta `.next` foi criada com sucesso.
 
 ### 2. Configurar Variável de Ambiente no AWS Amplify
 
@@ -51,8 +52,9 @@ git push origin main
 ## Solução de Problemas
 
 ### Erro 404 Persiste
-- Verifique se o `amplify.yml` na raiz do projeto aponta para `frontend/out`
-- Confirme que a build gerou a pasta `out`
+- Verifique se o buildSpec aponta para `frontend/.next`
+- Confirme que a build gerou a pasta `.next`
+- Verifique se o Amplify está usando plataforma WEB com SSR
 
 ### Erro 401 Persiste
 1. **Variável de Ambiente**: Confirme que `NEXT_PUBLIC_API_URL` está configurada
@@ -71,12 +73,12 @@ Se mudou o domínio do Amplify, atualize a variável `CORS_ORIGINS` no App Runne
 
 ```
 frontend/
-├── out/              ← Gerado pelo Next.js (arquivos estáticos)
-│   ├── index.html
-│   ├── _next/
+├── .next/            ← Gerado pelo Next.js (SSR)
+│   ├── standalone/
+│   ├── static/
 │   └── ...
-├── amplify.yml       ← Configuração do Amplify (aponta para 'out')
-└── next.config.js    ← Configuração do Next.js (output: 'export')
+├── amplify.yml       ← Configuração do Amplify (aponta para '.next')
+└── next.config.js    ← Configuração do Next.js (output: 'standalone')
 ```
 
 ## Referências
