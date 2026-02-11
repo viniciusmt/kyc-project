@@ -38,8 +38,9 @@ async def root():
     """Health check endpoint"""
     return {
         "status": "online",
-        "version": "2.0.0",
-        "service": "KYC System API"
+        "version": "2.0.1",
+        "service": "KYC System API",
+        "deployed_at": "2026-02-11"
     }
 
 
