@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "KYC System"
 
     # CORS - aceita string separada por vírgula ou lista
-    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000,https://main.d1pcg3lkjfaxct.amplifyapp.com")
+    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000,https://main.d1pcg3lkjfaxct.amplifyapp.com,https://main.d1a6bdu7v29m3g.amplifyapp.com")
 
     # Supabase (virão do SSM no App Runner)
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
