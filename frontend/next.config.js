@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: 'export',
+  // Removido 'output: export' - não funciona com rotas dinâmicas
   images: { unoptimized: true },
   trailingSlash: true,
   env: {
