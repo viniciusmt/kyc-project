@@ -9,7 +9,10 @@ from pydantic import BaseModel, EmailStr
 from app.services.auth_service import AuthService
 
 router = APIRouter()
-auth_service = AuthService()
+
+def get_auth_service():
+    """Lazy initialization of AuthService"""
+    return AuthService()
 
 
 class LoginRequest(BaseModel):
@@ -26,7 +29,7 @@ class LoginResponse(BaseModel):
 
 
 @router.post("/login", response_model=LoginResponse)
-async def login(credentials: LoginRequest):
+async def login(credentials: LoginRequest, auth_service: AuthService = Depends(get_auth_service)):
     """
     Login do usuário
 
@@ -55,6 +58,7 @@ async def logout():
 
 
 @router.get("/me")
-async def get_current_user(user=Depends(auth_service.get_current_user)):
+async def get_current_user(auth_service: AuthService = Depends(get_auth_service)):
     """Retorna informações do usuário autenticado"""
+    user = await auth_service.get_current_user()
     return user

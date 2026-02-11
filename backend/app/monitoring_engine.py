@@ -9,15 +9,18 @@ import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from supabase import create_client, Client
-from dotenv import load_dotenv
-import kyc_engine
+from app import kyc_engine
+from app.core.config import settings
 
-load_dotenv()
+# Supabase client - inicializado no primeiro uso
+_supabase_client = None
 
-# Inicializa Supabase
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+def get_supabase() -> Client:
+    """Lazy initialization do Supabase client"""
+    global _supabase_client
+    if _supabase_client is None:
+        _supabase_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+    return _supabase_client
 
 
 def compute_status(doc_type: Optional[str], kyc_data: Dict) -> str:
@@ -69,7 +72,7 @@ def add_monitored_record(document: str, notes: str, company_id: str) -> Dict[str
 
         # Verifica se já existe (idempotente)
         existing = (
-            supabase.table("monitoring_targets")
+            get_supabase().table("monitoring_targets")
             .select("id,document,doc_type,current_status,data_json")
             .eq("document", clean_doc)
             .eq("company_id", company_id)
@@ -118,7 +121,7 @@ def add_monitored_record(document: str, notes: str, company_id: str) -> Dict[str
             "data_json": kyc_data
         }
 
-        response = supabase.table("monitoring_targets").insert(record).execute()
+        response = get_supabase().table("monitoring_targets").insert(record).execute()
 
         if getattr(response, "error", None):
             return {"success": False, "error": f"Erro ao salvar registro: {response.error}"}
@@ -159,7 +162,7 @@ def remove_monitored_record(document: str, company_id: str) -> Dict[str, any]:
     try:
         clean_doc = ''.join(filter(str.isdigit, document))
 
-        response = supabase.table("monitoring_targets").delete().eq("document", clean_doc).eq("company_id", company_id).execute()
+        response = get_supabase().table("monitoring_targets").delete().eq("document", clean_doc).eq("company_id", company_id).execute()
 
         return {"success": True, "message": "Registro removido do monitoramento"}
 
@@ -181,7 +184,7 @@ def get_monitored_record(document: str, company_id: str) -> Optional[Dict]:
     try:
         clean_doc = ''.join(filter(str.isdigit, document))
 
-        response = supabase.table("monitoring_targets").select("*").eq("document", clean_doc).eq("company_id", company_id).execute()
+        response = get_supabase().table("monitoring_targets").select("*").eq("document", clean_doc).eq("company_id", company_id).execute()
 
         if response.data and len(response.data) > 0:
             return response.data[0]
@@ -215,7 +218,7 @@ def get_all_monitored_records(
         offset = (page - 1) * page_size
 
         # Monta query
-        query = supabase.table("monitoring_targets").select("*", count="exact")
+        query = get_supabase().table("monitoring_targets").select("*", count="exact")
 
         if company_id:
             query = query.eq("company_id", company_id)
@@ -228,7 +231,7 @@ def get_all_monitored_records(
         total = count_response.count if hasattr(count_response, 'count') else 0
 
         # Busca registros
-        query = supabase.table("monitoring_targets").select("*")
+        query = get_supabase().table("monitoring_targets").select("*")
         if company_id:
             query = query.eq("company_id", company_id)
         if filter_type:
@@ -262,21 +265,21 @@ def get_monitoring_stats(company_id: str) -> Dict[str, any]:
     """
     try:
         # Total de registros
-        response = supabase.table("monitoring_targets").select("*", count="exact").eq("company_id", company_id).execute()
+        response = get_supabase().table("monitoring_targets").select("*", count="exact").eq("company_id", company_id).execute()
         total = response.count if hasattr(response, 'count') else 0
 
         # Registros com restrições (precisa buscar data_json)
-        all_records = supabase.table("monitoring_targets").select("data_json").eq("company_id", company_id).execute()
+        all_records = get_supabase().table("monitoring_targets").select("data_json").eq("company_id", company_id).execute()
         total_with_restrictions = sum(1 for r in (all_records.data or []) if r.get("data_json", {}).get("restriction_count", 0) > 0)
 
         # Registros ativos
-        active = supabase.table("monitoring_targets").select("id", count="exact").eq("company_id", company_id).eq("current_status", "ATIVO").execute()
+        active = get_supabase().table("monitoring_targets").select("id", count="exact").eq("company_id", company_id).eq("current_status", "ATIVO").execute()
         total_active = active.count if hasattr(active, 'count') else 0
 
         # Contagem por tipo
-        cpf = supabase.table("monitoring_targets").select("id", count="exact").eq("company_id", company_id).eq("doc_type", "CPF").execute()
+        cpf = get_supabase().table("monitoring_targets").select("id", count="exact").eq("company_id", company_id).eq("doc_type", "CPF").execute()
         total_cpf = cpf.count if hasattr(cpf, 'count') else 0
-        cnpj = supabase.table("monitoring_targets").select("id", count="exact").eq("company_id", company_id).eq("doc_type", "CNPJ").execute()
+        cnpj = get_supabase().table("monitoring_targets").select("id", count="exact").eq("company_id", company_id).eq("doc_type", "CNPJ").execute()
         total_cnpj = cnpj.count if hasattr(cnpj, 'count') else 0
 
         return {
@@ -347,7 +350,7 @@ def update_single_record(document: str, company_id: str) -> Dict[str, any]:
             "current_status": current_status
         }
 
-        response = supabase.table("monitoring_targets").update(update_data).eq("document", clean_doc).eq("company_id", company_id).execute()
+        response = get_supabase().table("monitoring_targets").update(update_data).eq("document", clean_doc).eq("company_id", company_id).execute()
 
         return {
             "success": True,
@@ -373,7 +376,7 @@ def update_all_records(company_id: str) -> Dict[str, any]:
     """
     try:
         # Busca todos os registros
-        response = supabase.table("monitoring_targets").select("document").eq("company_id", company_id).execute()
+        response = get_supabase().table("monitoring_targets").select("document").eq("company_id", company_id).execute()
 
         if not response.data:
             return {"success": True, "total": 0, "updated": 0, "errors": 0}
@@ -415,7 +418,7 @@ def get_recent_changes(days: int = 2, company_id: str = None) -> Dict[str, any]:
         cutoff_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
 
         # Busca todos os registros e filtra por data no data_json
-        query = supabase.table("monitoring_targets").select("*")
+        query = get_supabase().table("monitoring_targets").select("*")
 
         if company_id:
             query = query.eq("company_id", company_id)

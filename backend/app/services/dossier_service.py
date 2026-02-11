@@ -18,10 +18,6 @@ except Exception:
     genai = None
 
 
-# Inicializa Supabase
-supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
-
-
 def _build_ai_prompt(kyc_data: Dict, report_data: Dict) -> str:
     doc = kyc_data.get("document", "")
     doc_type = kyc_data.get("doc_type", "")
@@ -169,6 +165,17 @@ def _fallback_entity_name(dossier: Dict) -> str:
 class DossierService:
     """Serviço de gerenciamento de dossiês"""
 
+    def __init__(self):
+        """Inicializa o serviço com lazy loading do Supabase client"""
+        self._supabase = None
+
+    @property
+    def supabase(self) -> Client:
+        """Lazy initialization do Supabase client"""
+        if self._supabase is None:
+            self._supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+        return self._supabase
+
     def generate_and_save(
         self,
         document: str,
@@ -306,7 +313,7 @@ class DossierService:
                 "decisor_id": None
             }
 
-            response = supabase.table("dossiers").insert(dossier_record).execute()
+            response = self.supabase.table("dossiers").insert(dossier_record).execute()
 
             if response.data and len(response.data) > 0:
                 dossier_id = response.data[0]["id"]
@@ -345,11 +352,11 @@ class DossierService:
             offset = (page - 1) * page_size
 
             # Conta total
-            count_response = supabase.table("dossiers").select("id", count="exact").eq("company_id", company_id).execute()
+            count_response = self.supabase.table("dossiers").select("id", count="exact").eq("company_id", company_id).execute()
             total = count_response.count if hasattr(count_response, 'count') else 0
 
             # Busca registros paginados
-            response = supabase.table("dossiers").select("*").eq("company_id", company_id).order("created_at", desc=True).range(offset, offset + page_size - 1).execute()
+            response = self.supabase.table("dossiers").select("*").eq("company_id", company_id).order("created_at", desc=True).range(offset, offset + page_size - 1).execute()
 
             dossiers = response.data if response.data else []
             for d in dossiers:
@@ -373,7 +380,7 @@ class DossierService:
             Dossiê ou None
         """
         try:
-            response = supabase.table("dossiers").select("*").eq("id", dossier_id).eq("company_id", company_id).execute()
+            response = self.supabase.table("dossiers").select("*").eq("id", dossier_id).eq("company_id", company_id).execute()
 
             if response.data and len(response.data) > 0:
                 dossier = response.data[0]
@@ -401,7 +408,7 @@ class DossierService:
             # Limpa documento
             clean_doc = ''.join(filter(str.isdigit, document))
 
-            response = supabase.table("dossiers").select("id").eq("document_value", clean_doc).eq("company_id", company_id).limit(1).execute()
+            response = self.supabase.table("dossiers").select("id").eq("document_value", clean_doc).eq("company_id", company_id).limit(1).execute()
 
             if response.data and len(response.data) > 0:
                 return response.data[0]["id"]
@@ -510,7 +517,7 @@ class DossierService:
                 "data_decisao": datetime.utcnow().isoformat()
             }
 
-            response = supabase.table("dossiers").update(update_data).eq("id", dossier_id).eq("company_id", company_id).execute()
+            response = self.supabase.table("dossiers").update(update_data).eq("id", dossier_id).eq("company_id", company_id).execute()
 
             if response.data and len(response.data) > 0:
                 return {

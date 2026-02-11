@@ -11,8 +11,15 @@ from app.services.auth_service import AuthService
 from app.services.dossier_service import DossierService
 
 router = APIRouter()
-auth_service = AuthService()
-dossier_service = DossierService()
+
+def get_auth_service():
+    return AuthService()
+
+def get_dossier_service():
+    return DossierService()
+
+def get_current_user(auth_service: AuthService = Depends(get_auth_service)):
+    return auth_service.get_current_user
 
 
 class CreateDossierRequest(BaseModel):
@@ -49,7 +56,8 @@ class DossierResponse(BaseModel):
 @router.post("/", status_code=201)
 async def create_dossier(
     request: CreateDossierRequest,
-    user=Depends(auth_service.get_current_user)
+    dossier_service: DossierService = Depends(get_dossier_service),
+    user=Depends(get_current_user)
 ):
     """
     Gera e salva um novo dossiê
@@ -76,7 +84,8 @@ async def create_dossier(
 async def create_batch_dossiers(
     request: BatchDossiersRequest,
     background_tasks: BackgroundTasks,
-    user=Depends(auth_service.get_current_user)
+    dossier_service: DossierService = Depends(get_dossier_service),
+    user=Depends(get_current_user)
 ):
     """
     Processa múltiplos dossiês em background
@@ -104,7 +113,8 @@ async def create_batch_dossiers(
 async def list_dossiers(
     page: int = 1,
     page_size: int = 20,
-    user=Depends(auth_service.get_current_user)
+    dossier_service: DossierService = Depends(get_dossier_service),
+    user=Depends(get_current_user)
 ):
     """Lista dossiês da empresa (paginado)"""
     dossiers, total = dossier_service.list_dossiers(
@@ -119,7 +129,8 @@ async def list_dossiers(
 @router.get("/check-duplicate")
 async def check_duplicate(
     document: str,
-    user=Depends(auth_service.get_current_user)
+    dossier_service: DossierService = Depends(get_dossier_service),
+    user=Depends(get_current_user)
 ):
     """Verifica se já existe dossiê para o documento"""
     existing_id = dossier_service.check_duplicate(
@@ -136,7 +147,8 @@ async def check_duplicate(
 @router.get("/{dossier_id}", response_model=DossierResponse)
 async def get_dossier(
     dossier_id: str,
-    user=Depends(auth_service.get_current_user)
+    dossier_service: DossierService = Depends(get_dossier_service),
+    user=Depends(get_current_user)
 ):
     """
     Retorna dossiê completo por ID
@@ -161,7 +173,8 @@ async def get_dossier(
 async def decide_dossier(
     dossier_id: str,
     request: DossierDecisionRequest,
-    user=Depends(auth_service.get_current_user)
+    dossier_service: DossierService = Depends(get_dossier_service),
+    user=Depends(get_current_user)
 ):
     """
     Registra a decisão de diretoria sobre o dossiê
