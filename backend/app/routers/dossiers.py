@@ -1,25 +1,34 @@
 """
 Dossiers Router
 ===============
-Rotas para gerenciamento de dossiês
+Rotas para gerenciamento de dossies
 """
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from pydantic import BaseModel
 from typing import List, Optional
-from app.services.auth_service import AuthService
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi.security.http import HTTPAuthorizationCredentials
+from pydantic import BaseModel
+
+from app.services.auth_service import AuthService, security
 from app.services.dossier_service import DossierService
 
 router = APIRouter()
 
+
 def get_auth_service():
     return AuthService()
+
 
 def get_dossier_service():
     return DossierService()
 
-def get_current_user(auth_service: AuthService = Depends(get_auth_service)):
-    return auth_service.get_current_user
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    return await auth_service.get_current_user(credentials)
 
 
 class CreateDossierRequest(BaseModel):
@@ -57,21 +66,13 @@ class DossierResponse(BaseModel):
 async def create_dossier(
     request: CreateDossierRequest,
     dossier_service: DossierService = Depends(get_dossier_service),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
 ):
-    """
-    Gera e salva um novo dossiê
-
-    - Consulta APIs públicas (BrasilAPI, Transparência)
-    - Opcionalmente executa análise de IA
-    - Salva no Supabase
-    - Retorna dossier_id para acesso
-    """
     result = dossier_service.generate_and_save(
         document=request.document,
         company_id=user["company_id"],
         enable_ai=request.enable_ai,
-        cep=request.cep
+        cep=request.cep,
     )
 
     if not result["success"]:
@@ -85,27 +86,19 @@ async def create_batch_dossiers(
     request: BatchDossiersRequest,
     background_tasks: BackgroundTasks,
     dossier_service: DossierService = Depends(get_dossier_service),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
 ):
-    """
-    Processa múltiplos dossiês em background
-
-    - Recebe lista de documentos
-    - Processa em background com delay de 2s
-    - Retorna task_id para acompanhamento
-    """
-    # Adiciona task em background
     background_tasks.add_task(
         dossier_service.process_batch,
         documents=request.documents,
         company_id=user["company_id"],
-        enable_ai=request.enable_ai
+        enable_ai=request.enable_ai,
     )
 
     return {
         "message": f"Processamento iniciado para {len(request.documents)} documento(s)",
         "total": len(request.documents),
-        "status": "processing"
+        "status": "processing",
     }
 
 
@@ -114,13 +107,12 @@ async def list_dossiers(
     page: int = 1,
     page_size: int = 20,
     dossier_service: DossierService = Depends(get_dossier_service),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
 ):
-    """Lista dossiês da empresa (paginado)"""
     dossiers, total = dossier_service.list_dossiers(
         company_id=user["company_id"],
         page=page,
-        page_size=page_size
+        page_size=page_size,
     )
 
     return dossiers
@@ -130,17 +122,16 @@ async def list_dossiers(
 async def check_duplicate(
     document: str,
     dossier_service: DossierService = Depends(get_dossier_service),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
 ):
-    """Verifica se já existe dossiê para o documento"""
     existing_id = dossier_service.check_duplicate(
         document=document,
-        company_id=user["company_id"]
+        company_id=user["company_id"],
     )
 
     return {
         "exists": existing_id is not None,
-        "dossier_id": existing_id
+        "dossier_id": existing_id,
     }
 
 
@@ -148,23 +139,15 @@ async def check_duplicate(
 async def get_dossier(
     dossier_id: str,
     dossier_service: DossierService = Depends(get_dossier_service),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
 ):
-    """
-    Retorna dossiê completo por ID
-
-    Modo leitura: carrega dados salvos (sem reprocessamento)
-    """
     dossier = dossier_service.get_by_id(
         dossier_id=dossier_id,
-        company_id=user["company_id"]
+        company_id=user["company_id"],
     )
 
     if not dossier:
-        raise HTTPException(
-            status_code=404,
-            detail="Dossiê não encontrado"
-        )
+        raise HTTPException(status_code=404, detail="Dossie nao encontrado")
 
     return dossier
 
@@ -174,44 +157,29 @@ async def decide_dossier(
     dossier_id: str,
     request: DossierDecisionRequest,
     dossier_service: DossierService = Depends(get_dossier_service),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
 ):
-    """
-    Registra a decisão de diretoria sobre o dossiê
-
-    - Valida que o dossiê pertence à empresa do usuário (multi-tenant)
-    - Atualiza parecer técnico, status de decisão e justificativa
-    - Registra data/hora da decisão
-    """
-    # Valida que o dossiê existe e pertence à empresa
     dossier = dossier_service.get_by_id(
         dossier_id=dossier_id,
-        company_id=user["company_id"]
+        company_id=user["company_id"],
     )
 
     if not dossier:
-        raise HTTPException(
-            status_code=404,
-            detail="Dossiê não encontrado"
-        )
+        raise HTTPException(status_code=404, detail="Dossie nao encontrado")
 
-    # Atualiza a decisão
     result = dossier_service.update_decision(
         dossier_id=dossier_id,
         company_id=user["company_id"],
         parecer_tecnico=request.parecer_tecnico,
         aprovado=request.aprovado,
-        justificativa=request.justificativa
+        justificativa=request.justificativa,
     )
 
     if not result["success"]:
-        raise HTTPException(
-            status_code=400,
-            detail=result.get("error", "Erro ao atualizar decisão")
-        )
+        raise HTTPException(status_code=400, detail=result.get("error", "Erro ao atualizar decisao"))
 
     return {
         "success": True,
-        "message": "Decisão registrada com sucesso",
-        "status_decisao": result.get("status_decisao")
+        "message": "Decisao registrada com sucesso",
+        "status_decisao": result.get("status_decisao"),
     }

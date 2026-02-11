@@ -1,25 +1,34 @@
 """
 Monitoring Router
 =================
-Rotas para monitoramento contínuo de documentos
+Rotas para monitoramento continuo de documentos
 """
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security.http import HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from typing import List, Optional
-from app.services.auth_service import AuthService
+
+from app.services.auth_service import AuthService, security
 from app.services.monitoring_service import MonitoringService
 
 router = APIRouter()
 
+
 def get_auth_service():
     return AuthService()
+
 
 def get_monitoring_service():
     return MonitoringService()
 
-def get_current_user(auth_service: AuthService = Depends(get_auth_service)):
-    return auth_service.get_current_user
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    return await auth_service.get_current_user(credentials)
 
 
 class AddMonitoringRequest(BaseModel):
@@ -31,13 +40,12 @@ class AddMonitoringRequest(BaseModel):
 async def add_to_monitoring(
     request: AddMonitoringRequest,
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
 ):
-    """Adiciona documento ao monitoramento contínuo"""
     result = monitoring_service.add_record(
         document=request.document,
         company_id=user["company_id"],
-        notes=request.notes
+        notes=request.notes,
     )
 
     if not result["success"]:
@@ -52,34 +60,29 @@ async def list_monitored(
     page_size: int = 10,
     doc_type: Optional[str] = None,
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
 ):
-    """Lista documentos monitorados"""
     result = monitoring_service.get_all_records(
         company_id=user["company_id"],
         page=page,
         page_size=page_size,
-        filter_type=doc_type
+        filter_type=doc_type,
     )
 
     return {
         "records": result.get("records", []),
         "total": result.get("total", 0),
         "page": page,
-        "page_size": page_size
+        "page_size": page_size,
     }
 
 
 @router.get("/stats")
 async def get_monitoring_stats(
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
 ):
-    """Retorna estatísticas do monitoramento"""
-    stats = monitoring_service.get_stats(
-        company_id=user["company_id"]
-    )
-
+    stats = monitoring_service.get_stats(company_id=user["company_id"])
     return stats
 
 
@@ -87,12 +90,11 @@ async def get_monitoring_stats(
 async def update_monitored(
     document: str,
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
 ):
-    """Atualiza um documento monitorado"""
     result = monitoring_service.update_single(
         document=document,
-        company_id=user["company_id"]
+        company_id=user["company_id"],
     )
 
     if not result["success"]:
@@ -104,13 +106,9 @@ async def update_monitored(
 @router.put("/all")
 async def update_all_monitored(
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
 ):
-    """Atualiza todos os documentos monitorados"""
-    result = monitoring_service.update_all(
-        company_id=user["company_id"]
-    )
-
+    result = monitoring_service.update_all(company_id=user["company_id"])
     return result
 
 
@@ -118,12 +116,11 @@ async def update_all_monitored(
 async def remove_from_monitoring(
     document: str,
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
 ):
-    """Remove documento do monitoramento"""
     result = monitoring_service.remove_record(
         document=document,
-        company_id=user["company_id"]
+        company_id=user["company_id"],
     )
 
     if not result["success"]:
@@ -136,13 +133,9 @@ async def remove_from_monitoring(
 async def get_recent_changes(
     days: int = 2,
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
 ):
-    """Retorna mudanças recentes detectadas"""
-    result = monitoring_service.get_recent_changes(
-        company_id=user["company_id"],
-        days=days
-    )
+    result = monitoring_service.get_recent_changes(company_id=user["company_id"], days=days)
 
     if isinstance(result, dict):
         changes = result.get("changes", [])
