@@ -52,11 +52,26 @@ jobs:
           SERVICE_ARN="${{ secrets.APPRUNNER_SERVICE_ARN }}"
 
           if [ -n "$SERVICE_ARN" ]; then
-            echo "Forçando redesploy do App Runner..."
-            aws apprunner start-deployment \
+            echo "Verificando status do serviço..."
+            STATUS=$(aws apprunner describe-service \
               --service-arn $SERVICE_ARN \
-              --region ${{ env.AWS_REGION }}
-            echo "✓ Deploy iniciado com sucesso!"
+              --region ${{ env.AWS_REGION }} \
+              --query 'Service.Status' \
+              --output text)
+
+            echo "Status atual: $STATUS"
+
+            if [ "$STATUS" = "RUNNING" ]; then
+              echo "Forçando redesploy do App Runner..."
+              aws apprunner start-deployment \
+                --service-arn $SERVICE_ARN \
+                --region ${{ env.AWS_REGION }}
+              echo "✓ Deploy iniciado com sucesso!"
+            else
+              echo "⚠️ Serviço não está em RUNNING (status: $STATUS)"
+              echo "App Runner detectará automaticamente a nova imagem no ECR"
+              echo "Deploy será acionado automaticamente em alguns minutos"
+            fi
           else
             echo "⚠️  APPRUNNER_SERVICE_ARN não configurado nos secrets"
             echo "O deploy automático do ECR será acionado em alguns minutos"
