@@ -7,6 +7,11 @@ import { dossiersService } from '@/services/dossiers';
 import { Dossier } from '@/types';
 import Header from '@/components/Header';
 
+// Necessário para exportação estática com rotas dinâmicas
+export function generateStaticParams() {
+  return [];
+}
+
 export default function DossierPage() {
   const router = useRouter();
   const params = useParams();
